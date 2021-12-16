@@ -3,10 +3,10 @@ import time
 import torch.utils.model_zoo as model_zoo
 import cv2
 
-from mtcnn_experiment.models import PNet,ONet,RNet
+from mobilefacenet_experiment.mtcnn.models import PNet,ONet,RNet
 
-from mtcnn_experiment.tools.image_tools import *
-import mtcnn_experiment.tools.utils as utils
+from mobilefacenet_experiment.mtcnn.tools.image_tools import *
+import mobilefacenet_experiment.mtcnn.tools.utils as utils
 
 model_urls = {
     'pnet': 'https://github.com/xiezheng-cs/mtcnn_pytorch/releases/download/mtcnn/pnet-3da9e965.pt',
@@ -15,9 +15,9 @@ model_urls = {
 }
 
 model_pth = {
-    'pnet':'F:\Homework\MechineLearning\FaceRecognition\ML-04-master\mobilefacenet_experiment\mtcnn\checkpoints\\pnet-3da9e965.pt',
-    'rnet':'F:\Homework\MechineLearning\FaceRecognition\ML-04-master\mobilefacenet_experiment\mtcnn\checkpoints\\rnet-ea379816.pt',
-    'onet':'F:\Homework\MechineLearning\FaceRecognition\ML-04-master\mobilefacenet_experiment\mtcnn\checkpoints\\onet-4b09b161.pt'
+    'pnet':'F:\Homework\MechineLearning\FaceRecognition\FaceRecognitionSystem\mobilefacenet_experiment\mtcnn\checkpoints\\pnet-3da9e965.pt',
+    'rnet':'F:\Homework\MechineLearning\FaceRecognition\FaceRecognitionSystem\mobilefacenet_experiment\mtcnn\checkpoints\\rnet-ea379816.pt',
+    'onet':'F:\Homework\MechineLearning\FaceRecognition\FaceRecognitionSystem\mobilefacenet_experiment\mtcnn\checkpoints\\onet-4b09b161.pt'
 }
 
 class MtcnnDetector(object):
@@ -474,10 +474,10 @@ class MtcnnDetector(object):
             t3 = time.time() - t
             t = time.time()
 
-            print(f"Total time cost: {t1+t2+t3:.4f}s, "
-                        f"PNet time cost: {t1:.4f}s, "
-                        f"RNet time cost: {t2:.4f}s, "
-                        f"ONet time cost: {t2:.4f}s. ")
+            # print(f"Total time cost: {t1+t2+t3:.4f}s, "
+            #             f"PNet time cost: {t1:.4f}s, "
+            #             f"RNet time cost: {t2:.4f}s, "
+            #             f"ONet time cost: {t2:.4f}s. ")
 
 
         return boxes_align, landmark_align

@@ -29,8 +29,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # load model
 model = MobileFacenet()
-test_model_path = '../pretrained_model/mobilefacenet/mobilefacenet.pth'
-model.load_state_dict(torch.load(test_model_path))
+test_model_path = '../pretrained_model/mobilefacenet/164_0.9992.pth'
+model.load_state_dict(torch.load(test_model_path, map_location=torch.device('cpu')))
 model.eval()
 model.to(device)
 
@@ -114,7 +114,7 @@ def get_face_feature(model, face_img):
 
 
 def get_your_faceImg_feature(name, model, features_dict, mtcnn_detector):
-    faceImg_path = os.path.join(r'F:\Homework\MechineLearning\FaceRecognition\ML-04-master\mobilefacenet_experiment\img', name)
+    faceImg_path = os.path.join(r'F:\Homework\MechineLearning\FaceRecognition\FaceRecognitionSystem\mobilefacenet_experiment\img', name)
     # faceImg_path = r'F:\Homework\MechineLearning\FaceRecognition\ML-04-master\mobilefacenet_experiment\img'
     num_img_useful = 0
     for idx, img_name in enumerate(os.listdir(faceImg_path)):
@@ -143,12 +143,12 @@ if __name__ == '__main__':
     features_dict = json.load(open('../pretrained_model/mobilefacenet/features_dict/lab_undergraduate_visible_features.json', 'r'))
     test_your_video = True # 使用自己的照片测试，需要在video放入你的视频并设置测试视频设置为你的视频，同时在video/your_faceImg文件夹中放入你的图片，用于比对和识别：数量10+，
     if test_your_video == True:
-        name = 'huangzhihua'
+        name = 'xiangkun'
         features_dict = get_your_faceImg_feature(name, model, features_dict, mtcnn_detector)
     print('Features length:', len(features_dict))
     # select one data source from the follow optional img sources entrance
     # 拍视频尽量避免光线影响，不要太亮，摄像头距离人脸1米左右
-    video_src = './video/huangzhihua.mp4' # video path
+    video_src = './video/xiangkun.mp4' # video path
     # video_src = 0 # camera device id
     capture = cv2.VideoCapture(video_src)
     if not capture.isOpened():
