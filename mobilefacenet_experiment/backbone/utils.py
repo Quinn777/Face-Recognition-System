@@ -90,8 +90,8 @@ def snip_init(model, criterion, optimizer, train_loader, opt, logger):
     freeze_vars(model, "popup_scores")
 
 
-def initialize_scores(model, init_type, logger):
-    logger.info(f"Initialization relevance score with {init_type} initialization")
+def initialize_scores(model, init_type="kaiming_normal"):
+    print(f"Initialization relevance score with {init_type} initialization")
     for m in model.modules():
         if hasattr(m, "popup_scores"):
             if init_type == "kaiming_uniform":
@@ -132,40 +132,40 @@ def scale_rand_init(model, k, logger):
             # print(f"new std = {torch.std(m.weight.data)}")
 
 
-def prepare_model(model, args, logger):
+def prepare_model(model, exp_mode, k):
     """
         1. Set model pruning rate
         2. Set gradients base of training mode.
     """
 
-    set_prune_rate_model(model, args.k)
+    set_prune_rate_model(model, k)
 
-    if args.exp_mode == "pretrain":
-        logger.info(f"===>>  Pre-training network")
-        logger.info(f"gradient for importance_scores: None  | training weights only")
-        freeze_vars(model, "popup_scores", args.freeze_bn)
+    if exp_mode == "pretrain":
+        print(f"===>>  Pre-training network")
+        print(f"gradient for importance_scores: None  | training weights only")
+        freeze_vars(model, "popup_scores")
         unfreeze_vars(model, "weight")
         unfreeze_vars(model, "bias")
 
-    elif args.exp_mode == "prune":
-        logger.info(f"===>>  Pruning network")
-        logger.info(f" gradient for weights: None  | training importance scores only")
+    elif exp_mode == "prune":
+        print(f"===>>  Pruning network")
+        print(f" gradient for weights: None  | training importance scores only")
 
         unfreeze_vars(model, "popup_scores")
-        freeze_vars(model, "weight", args.freeze_bn)
-        freeze_vars(model, "bias", args.freeze_bn)
+        freeze_vars(model, "weight")
+        freeze_vars(model, "bias")
 
-    elif args.exp_mode == "finetune":
-        logger.info(f"===>>  Fine-tuning network")
-        logger.info(f"gradient for importance_scores: None  | fine-tuning important weigths only")
-        freeze_vars(model, "popup_scores", args.freeze_bn)
+    elif exp_mode == "finetune":
+        print(f"===>>  Fine-tuning network")
+        print(f"gradient for importance_scores: None  | fine-tuning important weigths only")
+        freeze_vars(model, "popup_scores")
         unfreeze_vars(model, "weight")
         unfreeze_vars(model, "bias")
 
     else:
-        assert False, f"{args.exp_mode} mode is not supported"
+        assert False, f" mode is not supported"
 
-    initialize_scores(model, args.scores_init_type, logger)
+    initialize_scores(model)
 
 
 def subnet_to_dense(subnet_dict, p):

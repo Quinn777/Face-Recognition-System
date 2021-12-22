@@ -6,26 +6,38 @@ from torch.autograd import Variable
 import math
 from torch.nn import Parameter
 
+
+def conv3x3(in_planes, out_planes, conv_layer, stride=1, groups=1, dilation=1):
+    """3x3 convolution with padding"""
+    return conv_layer(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+
+
+def conv1x1(in_planes, out_planes, conv_layer, stride=1):
+    """1x1 convolution"""
+    return conv_layer(in_planes, out_planes, kernel_size=1, stride=stride, padding=0, bias=False, dilation=1)
+
+
 class Bottleneck(nn.Module):
-    def __init__(self, inp, oup, stride, expansion):
+    def __init__(self, conv_layer, inp, oup, stride, expansion):
         super(Bottleneck, self).__init__()
         self.connect = stride == 1 and inp == oup
         #
         self.conv = nn.Sequential(
             #pw
-            nn.Conv2d(inp, inp * expansion, 1, 1, 0, bias=False),
+            conv_layer(inp, inp * expansion, 1, 1, 0, bias=False),
             nn.BatchNorm2d(inp * expansion),
             nn.PReLU(inp * expansion),
             # nn.ReLU(inplace=True),
 
             #dw
-            nn.Conv2d(inp * expansion, inp * expansion, 3, stride, 1, groups=inp * expansion, bias=False),
+            conv_layer(inp * expansion, inp * expansion, 3, stride, 1, groups=inp * expansion, bias=False),
             nn.BatchNorm2d(inp * expansion),
             nn.PReLU(inp * expansion),
             # nn.ReLU(inplace=True),
 
             #pw-linear
-            nn.Conv2d(inp * expansion, oup, 1, 1, 0, bias=False),
+            conv_layer(inp * expansion, oup, 1, 1, 0, bias=False),
             nn.BatchNorm2d(oup),
         )
 
@@ -36,13 +48,13 @@ class Bottleneck(nn.Module):
             return self.conv(x)
 
 class ConvBlock(nn.Module):
-    def __init__(self, inp, oup, k, s, p, dw=False, linear=False):
+    def __init__(self, conv_layer, inp, oup, k, s, p, dw=False, linear=False):
         super(ConvBlock, self).__init__()
         self.linear = linear
         if dw:
-            self.conv = nn.Conv2d(inp, oup, k, s, p, groups=inp, bias=False)
+            self.conv = conv_layer(inp, oup, k, s, p, groups=inp, bias=False)
         else:
-            self.conv = nn.Conv2d(inp, oup, k, s, p, bias=False)
+            self.conv = conv_layer(inp, oup, k, s, p, bias=False)
         self.bn = nn.BatchNorm2d(oup)
         if not linear:
             self.prelu = nn.PReLU(oup)
@@ -75,25 +87,25 @@ Mobilenetv2_bottleneck_setting = [
 ]
 
 class MobileFacenet(nn.Module):
-    def __init__(self, bottleneck_setting=Mobilefacenet_bottleneck_setting):
+    def __init__(self, conv_layer, bottleneck_setting=Mobilefacenet_bottleneck_setting):
         super(MobileFacenet, self).__init__()
+        self.cl = conv_layer
+        self.conv1 = ConvBlock(conv_layer, 3, 64, 3, 2, 1)
 
-        self.conv1 = ConvBlock(3, 64, 3, 2, 1)
-
-        self.dw_conv1 = ConvBlock(64, 64, 3, 1, 1, dw=True)
+        self.dw_conv1 = ConvBlock(conv_layer, 64, 64, 3, 1, 1, dw=True)
 
         self.inplanes = 64
         block = Bottleneck
         self.blocks = self._make_layer(block, bottleneck_setting)
 
-        self.conv2 = ConvBlock(128, 512, 1, 1, 0)
+        self.conv2 = ConvBlock(conv_layer, 128, 512, 1, 1, 0)
 
-        self.linear7 = ConvBlock(512, 512, (7, 6), 1, 0, dw=True, linear=True)
+        self.linear7 = ConvBlock(conv_layer, 512, 512, (7, 6), 1, 0, dw=True, linear=True)
 
-        self.linear1 = ConvBlock(512, 128, 1, 1, 0, linear=True)
+        self.linear1 = ConvBlock(conv_layer, 512, 128, 1, 1, 0, linear=True)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, conv_layer):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.BatchNorm2d):
@@ -105,9 +117,9 @@ class MobileFacenet(nn.Module):
         for t, c, n, s in setting:
             for i in range(n):
                 if i == 0:
-                    layers.append(block(self.inplanes, c, s, t))
+                    layers.append(block(self.cl, self.inplanes, c, s, t))
                 else:
-                    layers.append(block(self.inplanes, c, 1, t))
+                    layers.append(block(self.cl, self.inplanes, c, 1, t))
                 self.inplanes = c
 
         return nn.Sequential(*layers)
@@ -125,8 +137,9 @@ class MobileFacenet(nn.Module):
 
 
 class ArcMarginProduct(nn.Module):
-    def __init__(self, in_features=128, out_features=200, s=32.0, m=0.50, easy_margin=False):
+    def __init__(self, linear_layer, in_features=128, out_features=200, s=32.0, m=0.50, easy_margin=False):
         super(ArcMarginProduct, self).__init__()
+        self.linear_layer = linear_layer
         self.in_features = in_features
         self.out_features = out_features
         self.s = s
@@ -144,7 +157,7 @@ class ArcMarginProduct(nn.Module):
         self.mm = math.sin(math.pi - m) * m
 
     def forward(self, x, label):
-        cosine = F.linear(F.normalize(x), F.normalize(self.weight))
+        cosine = self.linear_layer(F.normalize(x), F.normalize(self.weight))
         sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
         phi = cosine * self.cos_m - sine * self.sin_m
         if self.easy_margin:
@@ -160,7 +173,10 @@ class ArcMarginProduct(nn.Module):
 
 
 if __name__ == "__main__":
+    from utils import get_layers, prepare_model
     input = Variable(torch.FloatTensor(2, 3, 112, 112))
-    net = MobileFacenet()
+    cl, ll = get_layers("subnet")
+    net = MobileFacenet(conv_layer=cl)
+    prepare_model(net, "prune", 0.5)
     x = net(input)
     print(x.shape)

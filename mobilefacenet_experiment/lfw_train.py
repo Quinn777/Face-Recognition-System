@@ -13,6 +13,8 @@ from lfw_test import lfw_test
 from dataset.dataset import Dataset
 
 from backbone.mobilefacenet import MobileFacenet
+from backbone.utils import get_layers, prepare_model
+
 from backbone.mobilenetv3 import mobilenetv3
 from head.metrics import ArcMarginProduct, AddMarginProduct, SphereProduct
 from lossfunction.focal_loss import FocalLoss
@@ -53,11 +55,10 @@ def save_model(model, metric_fc, iterations, val_acc):
         'iterations': iterations,
     }
     torch.save(state_dict, checkpoint)
-
-def get_model(args):
+def get_model(args, cl):
     model = None
     if args.backbone == 'mobilefacenet':
-        model = MobileFacenet()
+        model = MobileFacenet(cl)
     elif args.backbone == 'mobilenetv3':
         model = mobilenetv3()
     else:
@@ -71,16 +72,16 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 if __name__ == '__main__':
     args.use_gpu = True
     # model
-    args.backbone = "mobilenetv3"
-    args.pretrained= False # True if have pretrained model else False
+    args.backbone = "mobilefacenet"
+    args.pretrained= True # True if have pretrained model else False
     args.pretrained_model_path = '../pretrained_model/mobilefacenet/mobilefacenet.pth'
     # feature dim
     args.feature_dim = 256
     # training parameters
-    args.train_batch_size = 32
+    args.train_batch_size = 64
     args.test_batch_size = 32
-    args.lr = 1e-4
-    args.max_epoch = 40
+    args.lr = 1e-3
+    args.max_epoch = 100
     args.num_workers = 4
     # args.lfw_root = "../dataset/lfw-align-112x112"
     # args.lfw_train_list
@@ -134,10 +135,13 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() and args.use_gpu else 'cpu')
 
     # model
-    model = get_model(args)
+    cl, ll = get_layers("subnet")
+    model = get_model(args, cl)
     if args.pretrained == True:
-        model.load_state_dict(torch.load(args.pretrained_model_path))
+        model.load_state_dict(torch.load(args.pretrained_model_path), False)
         print('resume training: loaded pretrained model successfully!')
+    prepare_model(model, "pretrain", 1.0)
+
     model.to(device)
 
     # models.metrics: arcface, cosine, sphere
