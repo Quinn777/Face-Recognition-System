@@ -140,7 +140,7 @@ def prepare_model(model, exp_mode, k):
 
     set_prune_rate_model(model, k)
 
-    if exp_mode == "pretrain":
+    if exp_mode == "pretrain" or exp_mode == "test":
         print(f"===>>  Pre-training network")
         print(f"gradient for importance_scores: None  | training weights only")
         freeze_vars(model, "popup_scores")
@@ -205,7 +205,7 @@ def dense_to_subnet(model, state_dict):
     model.load_state_dict(state_dict, strict=False)
 
 
-def current_model_pruned_fraction(model, path, verbose=True):
+def current_model_pruned_fraction(model, state_dict, verbose=True):
     """
         Find pruning raio per layer. Return average of them.
         Result_dict should correspond to the checkpoint of model.
@@ -215,19 +215,19 @@ def current_model_pruned_fraction(model, path, verbose=True):
 
     pl = []
 
-    if os.path.exists(path):
-        state_dict = torch.load(path, map_location="cpu")["state_dict"]
-        for i, v in model.named_modules():
-            if "module." in i:
-                i = i[7:]
-            if isinstance(v, (nn.Conv2d, nn.Linear)):
-                if i + ".w" in state_dict.keys():
-                    d = state_dict[i + ".w"].data.cpu().numpy()
-                    p = 100 * np.sum(d == 0) / np.size(d)
-                    pl.append(p)
-                    if verbose:
-                        print(i, v, p)
-        return np.mean(pl)
+    # if os.path.exists(path):
+        # state_dict = torch.load(path, map_location="cpu")["state_dict"]
+    for i, v in model.named_modules():
+        if "module." in i:
+            i = i[7:]
+        if isinstance(v, (nn.Conv2d, nn.Linear)):
+            if i + ".popup_scores" in state_dict.keys():
+                d = state_dict[i + ".w"].data.cpu().numpy()
+                p = 100 * np.sum(d == 0) / np.size(d)
+                pl.append(p)
+                if verbose:
+                    print(i, v, p)
+    return np.mean(pl)
 
 
 def sanity_check_paramter_updates(model, last_ckpt):

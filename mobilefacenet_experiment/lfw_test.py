@@ -54,7 +54,7 @@ def get_features(model, device):
                       phase='test',
                       input_shape=args.input_shape,
                       img_mode = args.img_mode)
-    test_dataloader = DataLoader(dataset, batch_size=args.test_batch_size)
+    test_dataloader = DataLoader(dataset, batch_size=32)
     tbar = tqdm(test_dataloader)
     features_dict = {}
     with torch.no_grad():

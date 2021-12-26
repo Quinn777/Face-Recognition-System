@@ -1,0 +1,5 @@
+12-22 19-53 pretrain 100 best acc:0.9876(95),loss:0.0139
+12-22-21-47 prune 0.5 best acc 0.2619(96) loss:6.5838
+12-23-16-41 finetune 0.5 best acc:0.9649(188) loss 0.8935
+12-23-22-30 prune 0.8 best acc 0.6626 loss 1.3039
+12-24-09-34 finetune 0.8 acc0.9930 （167）loss0.0118

@@ -7,15 +7,11 @@ import time
 import json
 import numpy as np
 from tqdm import tqdm
-
 from config.config import args
 from lfw_test import lfw_test
 from dataset.dataset import Dataset
-
 from backbone.mobilefacenet import MobileFacenet
-from backbone.utils import get_layers, prepare_model
-
-from backbone.mobilenetv3 import mobilenetv3
+from backbone.utils import get_layers, prepare_model, subnet_to_dense
 from head.metrics import ArcMarginProduct, AddMarginProduct, SphereProduct
 from lossfunction.focal_loss import FocalLoss
 
@@ -25,6 +21,7 @@ from torch.utils.data import DataLoader
 import torch.backends.cudnn as cudnn
 
 cudnn.benchmark = True
+
 
 def save_model(model, metric_fc, iterations, val_acc):
     # save config parameter
@@ -36,11 +33,14 @@ def save_model(model, metric_fc, iterations, val_acc):
     # save model.state_dict()
     model_save_path = os.path.join(args.save_path, 'model', '%d_%.4f.pth' % (iterations, val_acc))
     metric_save_path = os.path.join(args.save_path, 'metric', '%d_%.4f.pth' % (iterations, val_acc))
+
+    dense_dict = subnet_to_dense(model.state_dict(), args.k)
+
     if args.parallel == True:
         torch.save(model.module.state_dict(), model_save_path)
         torch.save(metric_fc.module.state_dict(), metric_save_path)
     else:
-        torch.save(model.state_dict(), model_save_path)
+        torch.save(dense_dict, model_save_path)
         torch.save(metric_fc.state_dict(), metric_save_path)
 
     # save checkpoint
@@ -59,8 +59,6 @@ def get_model(args, cl):
     model = None
     if args.backbone == 'mobilefacenet':
         model = MobileFacenet(cl)
-    elif args.backbone == 'mobilenetv3':
-        model = mobilenetv3()
     else:
         print(args.backbone, ' is not available!')
     return model
@@ -73,15 +71,18 @@ if __name__ == '__main__':
     args.use_gpu = True
     # model
     args.backbone = "mobilefacenet"
-    args.pretrained= True # True if have pretrained model else False
-    args.pretrained_model_path = '../pretrained_model/mobilefacenet/mobilefacenet.pth'
+    # 加载预训练模型
+    args.pretrained= True
+    args.pretrained_model_path = "../pretrained_model/mobilefacenet/checkpoint/12-23_22-30/model/99_0.6626.pth"
+    args.train_mode = "finetune"
+    args.k = 0.8
     # feature dim
     args.feature_dim = 256
     # training parameters
     args.train_batch_size = 64
     args.test_batch_size = 32
     args.lr = 1e-3
-    args.max_epoch = 100
+    args.max_epoch = 200
     args.num_workers = 4
     # args.lfw_root = "../dataset/lfw-align-112x112"
     # args.lfw_train_list
@@ -114,10 +115,9 @@ if __name__ == '__main__':
 
     # **************************   dataset      *******************************
     args.train_dataset = 'experiment'
-    args.num_classes = 5751
+    args.num_classes = 5754
     train_root = args.lfw_root
     train_list = args.lfw_train_list
-
 
     # *********************   checkpoint save path   **************************
     datetime = time.strftime('%m-%d_%H-%M')
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     if args.pretrained == True:
         model.load_state_dict(torch.load(args.pretrained_model_path), False)
         print('resume training: loaded pretrained model successfully!')
-    prepare_model(model, "pretrain", 1.0)
+    prepare_model(model, args.train_mode, args.k)
 
     model.to(device)
 
@@ -226,7 +226,7 @@ if __name__ == '__main__':
             acc_sum += acc
             tbar.set_description('epoch:%d, loss:%.4f, acc:%.4f' % (epoch, loss_sum/(ii+1), acc_sum/(ii+1)))
             # lfw_dataset validation
-        if (epoch+1) % 1 == 0:
+        if (epoch+1) % 10 == 0:
             model.eval()
             lfw_acc, lfw_th, t = lfw_test(model, device)
             print('lfw_accuracy:%.4f, threshold:%.4f, total_time:%ds' % (lfw_acc, lfw_th, int(t)), '\n')
